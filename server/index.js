@@ -1,3 +1,4 @@
+/* eslint-env node */
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -9,8 +10,9 @@ app.use(cors());
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Vite 개발 서버
-    methods: ["GET", "POST"]
+    origin: "*", // 모든 origin 허용 (개발용)
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -215,7 +217,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
