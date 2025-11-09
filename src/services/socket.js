@@ -150,6 +150,7 @@ import { io } from 'socket.io-client';
 // 🚨 변경된 부분:
 // Vercel 환경 변수(import.meta.env.VITE_SOCKET_URL)가 로드되지 않을 경우,
 // Railway에 배포된 실제 서버 URL을 기본값으로 사용하도록 설정합니다.
+
 // 🚨 Vercel 환경 변수 로드 오류를 무시하고 실제 배포 주소로 강제 연결하기 위한 임시 수정
 const SOCKET_URL = 'https://study-with-me-production.up.railway.app'; 
 
