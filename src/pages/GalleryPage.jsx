@@ -4,6 +4,7 @@ import { Plus, Users, Clock, LogOut } from 'lucide-react';
 import socketService from '../services/socket';
 import useRoomStore from '../store/roomStore';
 import useAuthStore from '../store/authStore';
+import ThemeToggle from '../components/common/ThemeToggle';
 
 function GalleryPage() {
   const navigate = useNavigate();
@@ -40,7 +41,8 @@ function GalleryPage() {
     return () => {
       clearInterval(interval);
     };
-  }, [setRooms]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateRoom = async () => {
     if (!roomTitle.trim()) {
@@ -83,18 +85,19 @@ function GalleryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* 헤더 */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Study Rooms</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                안녕하세요, <span className="font-semibold text-purple-600">{userNickname}</span>님
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Study Rooms</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                안녕하세요, <span className="font-semibold text-purple-600 dark:text-purple-400">{userNickname}</span>님
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <ThemeToggle />
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2"
@@ -104,7 +107,7 @@ function GalleryPage() {
               </button>
               <button
                 onClick={handleLogout}
-                className="p-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-3 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 title="로그아웃"
               >
                 <LogOut className="w-5 h-5" />
@@ -124,10 +127,10 @@ function GalleryPage() {
           </div>
         ) : (
           <div className="text-center py-20">
-            <p className="text-gray-500 text-lg mb-4">현재 활성화된 공부방이 없습니다</p>
+            <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">현재 활성화된 공부방이 없습니다</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="text-purple-600 hover:text-purple-700 font-semibold"
+              className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold"
             >
               첫 번째 방을 만들어보세요!
             </button>
@@ -138,11 +141,11 @@ function GalleryPage() {
       {/* 방 만들기 모달 */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-6">새 공부방 만들기</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">새 공부방 만들기</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   방 제목
                 </label>
                 <input
@@ -150,7 +153,7 @@ function GalleryPage() {
                   value={roomTitle}
                   onChange={(e) => setRoomTitle(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleCreateRoom()}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="예: 조용히 같이 공부해요"
                   autoFocus
                 />
@@ -161,7 +164,7 @@ function GalleryPage() {
                     setShowCreateModal(false);
                     setRoomTitle('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   취소
                 </button>
@@ -188,7 +191,7 @@ function RoomCard({ room, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden group"
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden group"
     >
       {/* 썸네일 영역 */}
       <div className="h-40 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-200">
@@ -197,9 +200,9 @@ function RoomCard({ room, onClick }) {
 
       {/* 정보 영역 */}
       <div className="p-5">
-        <h3 className="text-xl font-bold text-gray-900 mb-3">{room.title}</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{room.title}</h3>
         
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center gap-1">
             <Users className="w-4 h-4" />
             <span>{room.participants}명</span>
@@ -210,8 +213,8 @@ function RoomCard({ room, onClick }) {
           </div>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-sm text-gray-500">방장: {room.owner}</p>
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">방장: {room.owner}</p>
         </div>
       </div>
     </div>

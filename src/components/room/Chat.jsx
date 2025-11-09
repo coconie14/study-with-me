@@ -43,8 +43,8 @@ function Chat({ roomId }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 flex flex-col h-96">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex flex-col h-96">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
         <MessageCircle className="w-5 h-5" />
         채팅
       </h2>
@@ -52,7 +52,7 @@ function Chat({ roomId }) {
       {/* 메시지 목록 */}
       <div className="flex-1 overflow-y-auto mb-4 space-y-3">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-400 mt-8">
+          <div className="text-center text-gray-400 dark:text-gray-500 mt-8">
             <p className="text-sm">아직 메시지가 없습니다</p>
             <p className="text-xs mt-1">첫 메시지를 보내보세요!</p>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Volume2, VolumeX, Youtube } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Youtube, Minimize2, Maximize2 } from 'lucide-react';
 import socketService from '../../services/socket';
 import useRoomStore from '../../store/roomStore';
 
@@ -10,11 +10,21 @@ function MediaPlayer({ roomId }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(50);
+  const [videoSize, setVideoSize] = useState('large'); // 👈 'large', 'small', 'audio'
   const playerRef = useRef(null);
   const isLoadingRef = useRef(false);
   
   const { currentRoom } = useRoomStore();
   const isOwner = currentRoom?.participants?.find(p => p.isOwner && p.id === socketService.getSocket()?.id);
+
+  // 크기 순환: large → small → audio → large
+  const cycleVideoSize = () => {
+    setVideoSize(prev => {
+      if (prev === 'large') return 'small';
+      if (prev === 'small') return 'audio';
+      return 'large';
+    });
+  };
 
   // YouTube IFrame API 로드
   useEffect(() => {
@@ -193,20 +203,37 @@ function MediaPlayer({ roomId }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">배경 음악/영상</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">배경 음악/영상</h2>
         <div className="flex items-center gap-2">
-          <Youtube className="w-4 h-4 text-gray-500" />
-          <span className="text-sm text-gray-500">YouTube</span>
+          <button
+            onClick={cycleVideoSize}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title={videoSize === 'large' ? '작게' : videoSize === 'small' ? '오디오만' : '크게'}
+          >
+            {videoSize === 'audio' ? (
+              <Volume2 className="w-4 h-4 text-purple-500" />
+            ) : videoSize === 'large' ? (
+              <Minimize2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            ) : (
+              <Maximize2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            )}
+          </button>
+          <Youtube className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          <span className="text-sm text-gray-500 dark:text-gray-400">YouTube</span>
           {!isOwner && (
-            <span className="ml-2 text-xs text-gray-400">방장만 컨트롤 가능</span>
+            <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">방장만 컨트롤 가능</span>
           )}
         </div>
       </div>
 
-      {/* YouTube 플레이어 영역 */}
-      <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden mb-4">
+      {/* YouTube 플레이어 영역 - 크기 조절 가능 */}
+      <div 
+        className={`bg-gray-900 rounded-lg overflow-hidden mb-4 transition-all duration-300 ${
+          videoSize === 'audio' ? 'h-0 opacity-0' : videoSize === 'small' ? 'h-40' : 'aspect-video'
+        }`}
+      >
         {!videoId ? (
           <div className="w-full h-full flex items-center justify-center text-gray-400">
             <div className="text-center">
@@ -221,6 +248,17 @@ function MediaPlayer({ roomId }) {
           <div ref={playerRef} className="w-full h-full"></div>
         )}
       </div>
+
+      {/* 오디오만 모드 표시 */}
+      {videoSize === 'audio' && videoId && (
+        <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center gap-3">
+          <Volume2 className="w-5 h-5 text-purple-600 dark:text-purple-400 animate-pulse" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">오디오만 재생 중</p>
+            <p className="text-xs text-purple-700 dark:text-purple-300">영상은 숨겨져 있지만 음악은 계속 재생됩니다</p>
+          </div>
+        </div>
+      )}
 
       {/* URL 입력 및 컨트롤 */}
       <div className="space-y-4">

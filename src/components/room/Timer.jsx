@@ -64,19 +64,19 @@ function Timer({ roomId }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">타이머</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">타이머</h2>
         {isOwner ? (
           <button
             onClick={() => setShowPresets(!showPresets)}
-            className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 font-medium"
+            className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
           >
             <Clock className="w-4 h-4" />
             시간 설정
           </button>
         ) : (
-          <span className="text-xs text-gray-500">방장만 컨트롤 가능</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">방장만 컨트롤 가능</span>
         )}
       </div>
 

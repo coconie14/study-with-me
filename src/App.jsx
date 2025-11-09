@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import GalleryPage from './pages/GalleryPage';
 import RoomPage from './pages/RoomPage';
 import useAuthStore from './store/authStore';
+import useThemeStore from './store/themeStore'; // 👈 추가
 import { auth } from './lib/supabase';
 
 // 보호된 라우트 컴포넌트
@@ -13,10 +14,10 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩중...</p>
+          <p className="text-gray-600 dark:text-gray-400">로딩중...</p>
         </div>
       </div>
     );
@@ -31,8 +32,12 @@ function ProtectedRoute({ children }) {
 
 function App() {
   const { setUser, setSession, setLoading, initialize } = useAuthStore();
+  const { initializeTheme } = useThemeStore(); // 👈 추가
 
   useEffect(() => {
+    // 테마 초기화 (localStorage에서 불러오기)
+    initializeTheme(); // 👈 추가
+    
     // 초기 인증 상태 확인
     initialize();
 
@@ -47,11 +52,11 @@ function App() {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [setUser, setSession, setLoading, initialize]);
+  }, [setUser, setSession, setLoading, initialize, initializeTheme]); // 👈 의존성 추가
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Routes>
           {/* 공개 라우트 */}
           <Route path="/" element={<IntroPage />} />
