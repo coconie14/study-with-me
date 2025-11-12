@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 import socketService from '../../services/socket';
 import chatService from '../../services/chatService';
 import useAuthStore from '../../store/authStore';
+// 💡 useToast 임포트
+import { useToast } from '../../contexts/ToastProvider';
 
 function Chat({ roomId }) {
   const [messages, setMessages] = useState([]);
@@ -10,6 +12,7 @@ function Chat({ roomId }) {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const { user } = useAuthStore();
+  const { showToast } = useToast(); // 💡 useToast 사용
   
   // 사용자 닉네임
   const userNickname = user?.user_metadata?.nickname || user?.email?.split('@')[0] || 'User';
@@ -36,6 +39,7 @@ function Chat({ roomId }) {
         setMessages(formattedMessages);
       } catch (error) {
         console.error('Failed to load chat history:', error);
+        showToast('채팅 기록을 불러오는 데 실패했습니다.', 'error');
       } finally {
         setLoading(false);
       }
@@ -44,7 +48,7 @@ function Chat({ roomId }) {
     if (roomId) {
       loadChatHistory();
     }
-  }, [roomId]);
+  }, [roomId, showToast]);
 
   // Socket으로 새 메시지 실시간 수신
   useEffect(() => {
@@ -110,7 +114,8 @@ function Chat({ roomId }) {
 
     } catch (error) {
       console.error('Failed to send message:', error);
-      alert('메시지 전송에 실패했습니다');
+      // 💡 alert() 대신 showToast 사용
+      showToast('메시지 전송에 실패했습니다.', 'error');
       // 에러 발생 시 임시 메시지 제거
       setMessages((prev) => prev.filter(msg => msg.id !== tempId));
     }
@@ -163,12 +168,12 @@ function Chat({ roomId }) {
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="메시지 입력..."
-          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={handleSendMessage}
           disabled={!inputMessage.trim()}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           <Send className="w-4 h-4" />
         </button>
@@ -181,14 +186,14 @@ function ChatMessage({ nickname, message, time, isOwn }) {
   return (
     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
       <div className="flex items-baseline gap-2 mb-1">
-        <span className={`font-semibold text-sm ${isOwn ? 'text-purple-600 dark:text-purple-400' : 'text-gray-900 dark:text-white'}`}>
+        <span className={`font-semibold text-sm ${isOwn ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
           {nickname}
         </span>
         <span className="text-xs text-gray-400">{time}</span>
       </div>
       <p className={`text-sm rounded-lg px-3 py-2 max-w-xs break-words ${
         isOwn 
-          ? 'bg-purple-600 text-white' 
+          ? 'bg-blue-600 text-white' 
           : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
       }`}>
         {message}

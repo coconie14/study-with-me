@@ -34,6 +34,8 @@ io.on('connection', (socket) => {
     const room = {
       id: roomId,
       title: roomData.title,
+      coverImageUrl: roomData.coverImageUrl || null,
+      emoji: roomData.emoji || '📚',
       owner: socket.id,
       participants: [{
         id: socket.id,
@@ -103,6 +105,8 @@ io.on('connection', (socket) => {
     const roomList = Array.from(rooms.values()).map(room => ({
       id: room.id,
       title: room.title,
+      coverImageUrl: room.coverImageUrl,
+      emoji: room.emoji,
       participants: room.participants.length,
       owner: room.participants.find(p => p.isOwner)?.nickname || 'Unknown'
     }));

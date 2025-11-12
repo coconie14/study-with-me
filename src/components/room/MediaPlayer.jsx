@@ -65,7 +65,7 @@ function MediaPlayer({ roomId }) {
 
     // playerRef에 고유 ID 설정
     if (!playerRef.current.id) {
-      playerRef.current.id = `youtube-player-${Date.now()}`;
+      playerRef.current.id = `Youtubeer-${Date.now()}`;
     }
 
     // 새 플레이어 생성
@@ -213,7 +213,7 @@ function MediaPlayer({ roomId }) {
             title={videoSize === 'large' ? '작게' : videoSize === 'small' ? '오디오만' : '크게'}
           >
             {videoSize === 'audio' ? (
-              <Volume2 className="w-4 h-4 text-purple-500" />
+              <Volume2 className="w-4 h-4 text-blue-500" />
             ) : videoSize === 'large' ? (
               <Minimize2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             ) : (
@@ -251,11 +251,11 @@ function MediaPlayer({ roomId }) {
 
       {/* 오디오만 모드 표시 */}
       {videoSize === 'audio' && videoId && (
-        <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center gap-3">
-          <Volume2 className="w-5 h-5 text-purple-600 dark:text-purple-400 animate-pulse" />
+        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center gap-3">
+          <Volume2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-pulse" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">오디오만 재생 중</p>
-            <p className="text-xs text-purple-700 dark:text-purple-300">영상은 숨겨져 있지만 음악은 계속 재생됩니다</p>
+            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">오디오만 재생 중</p>
+            <p className="text-xs text-blue-700 dark:text-blue-300">영상은 숨겨져 있지만 음악은 계속 재생됩니다</p>
           </div>
         </div>
       )}
@@ -271,12 +271,12 @@ function MediaPlayer({ roomId }) {
               onChange={(e) => setUrl(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && loadVideo()}
               placeholder="YouTube URL 입력 (예: https://youtu.be/jfKfPfyJRdk)"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
               onClick={loadVideo}
               disabled={!url || !window.YT}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               재생
             </button>
@@ -319,7 +319,7 @@ function MediaPlayer({ roomId }) {
                 onChange={handleVolumeChange}
                 className="flex-1 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #9333ea 0%, #9333ea ${volume}%, #d1d5db ${volume}%, #d1d5db 100%)`,
+                  background: `linear-gradient(to right, #2563eb 0%, #2563eb ${volume}%, #d1d5db ${volume}%, #d1d5db 100%)`,
                 }}
               />
               <span className="text-sm text-gray-600 w-12 text-right">
@@ -336,9 +336,9 @@ function MediaPlayer({ roomId }) {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
-                  setUrl('https://youtu.be/jfKfPfyJRdk');
+                  setUrl('https://youtu.be/RTGkz2K632U?si=_RTsRBiUMHbSERLq');
                   setTimeout(() => {
-                    const id = extractVideoId('https://youtu.be/jfKfPfyJRdk');
+                    const id = extractVideoId('https://youtu.be/RTGkz2K632U?si=_RTsRBiUMHbSERLq');
                     if (id) {
                       setVideoId(id);
                       createPlayer(id);
@@ -346,15 +346,15 @@ function MediaPlayer({ roomId }) {
                     }
                   }, 100);
                 }}
-                className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors"
+                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
               >
-                Lofi Girl - beats to relax/study to
+                집중 잘되는 음악 
               </button>
               <button
                 onClick={() => {
-                  setUrl('https://youtu.be/5qap5aO4i9A');
+                  setUrl('https://youtu.be/wjR4ObKmfOU?si=D4ORHhCwrOJ4vzCW');
                   setTimeout(() => {
-                    const id = extractVideoId('https://youtu.be/5qap5aO4i9A');
+                    const id = extractVideoId('https://youtu.be/wjR4ObKmfOU?si=D4ORHhCwrOJ4vzCW');
                     if (id) {
                       setVideoId(id);
                       createPlayer(id);
@@ -362,9 +362,9 @@ function MediaPlayer({ roomId }) {
                     }
                   }, 100);
                 }}
-                className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors"
+                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
               >
-                Chillhop Radio
+                미친 집중력 모드 ON
               </button>
             </div>
           </div>

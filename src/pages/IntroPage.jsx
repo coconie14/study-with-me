@@ -5,7 +5,8 @@ function IntroPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    // 💡 배경 그라데이션을 보라색/분홍색에서 파란색/하늘색 계열로 변경
+    <div className="min-h-screen bg-gradient-to-br from-blue-700 via-blue-500 to-sky-400 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
         {/* 메인 타이틀 */}
         <div className="text-center mb-12">
@@ -45,7 +46,8 @@ function IntroPage() {
         <div className="text-center">
           <button
             onClick={() => navigate('/login')}
-            className="bg-white text-purple-600 px-12 py-4 rounded-full text-xl font-bold hover:bg-gray-100 transform hover:scale-105 transition-all duration-200 shadow-2xl"
+            // 💡 버튼 텍스트 색상을 보라색에서 파란색으로 변경
+            className="bg-white text-blue-600 px-12 py-4 rounded-full text-xl font-bold hover:bg-gray-100 transform hover:scale-105 transition-all duration-200 shadow-2xl"
           >
             시작하기
           </button>

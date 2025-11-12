@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Edit2, Calendar, Clock, TrendingUp } from 'lucide-react';
 import profileService from '../services/profileService';
 import useAuthStore from '../store/authStore';
@@ -77,9 +77,19 @@ function ProfilePage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
-                {/* 아바타 */}
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-3xl font-bold">
-                  {profile?.nickname?.[0]?.toUpperCase() || 'U'}
+                {/* 💡 아바타 표시 로직 수정: avatar_url이 있으면 사진 표시 */}
+                <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-blue-400 to-cyan-400">
+                  {profile?.avatar_url ? (
+                    <img 
+                      src={profile.avatar_url} 
+                      alt="Profile Avatar" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <span className="text-white text-3xl font-bold">
+                      {profile?.nickname?.[0]?.toUpperCase() || 'U'}
+                    </span>
+                  )}
                 </div>
                 
                 {/* 기본 정보 */}
@@ -99,10 +109,10 @@ function ProfilePage() {
                 </div>
               </div>
 
-              {/* 편집 버튼 */}
+              {/* 편집 버튼: 보라색을 파란색으로 변경 */}
               <button
                 onClick={() => setShowEditModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
               >
                 <Edit2 className="w-4 h-4" />
                 <span>편집</span>
@@ -119,20 +129,20 @@ function ProfilePage() {
 
           {/* 공부 통계 카드 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 총 공부 시간 */}
+            {/* 총 공부 시간: 보라색을 파란색으로 변경 */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                  <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <h3 className="font-semibold text-gray-900 dark:text-white">총 공부 시간</h3>
               </div>
-              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                 {Math.floor((profile?.total_study_time || 0) / 60)}h {(profile?.total_study_time || 0) % 60}m
               </p>
             </div>
 
-            {/* 완료한 세션 */}
+            {/* 완료한 세션 (그대로 유지 - 성과는 녹색이 적절) */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
@@ -146,7 +156,7 @@ function ProfilePage() {
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">최근 7일</p>
             </div>
 
-            {/* 평균 집중 시간 */}
+            {/* 평균 집중 시간 (블루 톤이 이미 적용되어 있어 유지) */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -180,7 +190,8 @@ function ProfilePage() {
                     className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      {/* 💡 활동 점을 파란색으로 변경 */}
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           공부 세션 완료
@@ -195,7 +206,8 @@ function ProfilePage() {
                         </p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                    {/* 💡 세션 시간 텍스트 색상을 파란색으로 변경 */}
+                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                       {session.duration_minutes}분
                     </span>
                   </div>

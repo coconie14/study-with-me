@@ -7,16 +7,21 @@ import profileService from '../services/profileService';
 import useRoomStore from '../store/roomStore';
 import useAuthStore from '../store/authStore';
 import ThemeToggle from '../components/common/ThemeToggle';
+import CreateRoomModal from '../components/room/CreateRoomModal';
+import { useToast } from '../contexts/ToastProvider';
+// 💡 Bouncing Loader 임포트
+import BouncingLoader from '../components/common/BouncingLoader';
+
 
 function GalleryPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [roomTitle, setRoomTitle] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { rooms, setRooms, setCurrentRoom } = useRoomStore();
   const { user, signOut } = useAuthStore();
-  
+
   // 사용자 닉네임
   const userNickname = user?.user_metadata?.nickname || user?.email?.split('@')[0] || 'User';
 
@@ -33,10 +38,10 @@ function GalleryPage() {
           if (error.code === 'PGRST116') {
             await profileService.createProfile(user.id, userNickname);
           }
+          console.error('Profile initialization failed:', error);
         }
       }
     };
-
     initProfile();
   }, [user, userNickname]);
 
@@ -47,6 +52,8 @@ function GalleryPage() {
       setRooms(roomList);
     } catch (error) {
       console.error('Failed to load rooms:', error);
+      // 💡 오류 Toast
+      showToast('방 목록을 불러오는 데 실패했습니다.', 'error');
     }
   };
 
@@ -57,37 +64,27 @@ function GalleryPage() {
     const interval = setInterval(loadRooms, 5000);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showToast]);
 
   // 방 생성
-  const handleCreateRoom = async () => {
-    if (!roomTitle.trim()) {
-      alert('방 제목을 입력해주세요');
-      return;
-    }
-
+  const handleCreateRoom = async (roomData) => {
     setLoading(true);
     try {
-      // 1️⃣ DB에 영구적인 방 정보 생성
       const room = await roomService.createRoom({
-        name: roomTitle,
-        description: '',
+        ...roomData,
         ownerId: user.id,
         ownerNickname: userNickname,
         maxParticipants: 6,
       });
 
-      // 2️⃣ Socket 서버에 실시간 방 생성 (DB UUID 전달)
       const socketResponse = await socketService.createRoom({
-        title: roomTitle,
+        title: room.name,
         nickname: userNickname,
         roomId: room.id,
+        coverImageUrl: roomData.coverImageUrl || null,
+        emoji: roomData.emoji || '📚',
       });
 
-      console.log('✅ 방 생성 완료:', { dbRoomId: room.id, socketRoomId: socketResponse.roomId });
-
-      // 3️⃣ 현재 방 정보 저장
       setCurrentRoom({
         ...room,
         id: room.id,
@@ -96,12 +93,13 @@ function GalleryPage() {
         isOwner: true,
       });
 
+      showToast(`'${room.name}' 방이 생성되었습니다.`, 'success');
       setShowCreateModal(false);
-      setRoomTitle('');
       navigate(`/room/${room.id}`);
     } catch (error) {
       console.error('Failed to create room:', error);
-      alert('방 생성에 실패했습니다: ' + (error.message || error.error || '알 수 없는 오류'));
+      // 💡 오류 Toast
+      showToast('방 생성에 실패했습니다: ' + (error.message || error.error || '알 수 없는 오류'), 'error');
     } finally {
       setLoading(false);
     }
@@ -111,31 +109,15 @@ function GalleryPage() {
   const handleJoinRoom = async (roomId) => {
     setLoading(true);
     try {
-      // 1️⃣ DB에서 방 정보 확인
       const room = await roomService.getRoom(roomId);
-      
-      if (!room) {
-        alert('존재하지 않는 방입니다');
-        return;
-      }
+      // 💡 alert() 대체
+      if (!room) return showToast('존재하지 않는 방입니다.', 'error');
+      if (!room.is_active) return showToast('비활성화된 방입니다.', 'error');
 
-      if (!room.is_active) {
-        alert('비활성화된 방입니다');
-        return;
-      }
-
-      // 2️⃣ Socket으로 방 입장 시도
       try {
         const socketResponse = await socketService.joinRoom(roomId, userNickname);
-        
-        // 3️⃣ DB에 참여자 추가
-        try {
-          await roomService.addParticipant(roomId, user.id, userNickname, false);
-        } catch {
-          console.log('이미 참여 중이거나 참여 기록이 있습니다');
-        }
+        await roomService.addParticipant(roomId, user.id, userNickname, false);
 
-        // 4️⃣ 현재 방 정보 저장
         setCurrentRoom({
           ...room,
           id: room.id,
@@ -145,22 +127,17 @@ function GalleryPage() {
         });
 
         navigate(`/room/${roomId}`);
-        
-      } catch {
-        // Socket 서버에 방이 없으면 재생성
-        console.log('Socket 서버에 방이 없어서 재생성합니다');
-        
+      } catch (socketError) {
+        console.warn('Socket room not found. Recreating room.', socketError);
+        // Socket 서버에 방이 없으면 재생성 (DB 상태를 기반으로 복구)
         const socketResponse = await socketService.createRoom({
           title: room.name,
           nickname: userNickname,
           roomId: room.id,
+          coverImageUrl: room.cover_image_url || null,
+          emoji: room.emoji || '📚',
         });
-
-        try {
-          await roomService.addParticipant(roomId, user.id, userNickname, false);
-        } catch {
-          console.log('이미 참여 중이거나 참여 기록이 있습니다');
-        }
+        await roomService.addParticipant(roomId, user.id, userNickname, false);
 
         setCurrentRoom({
           ...room,
@@ -174,7 +151,8 @@ function GalleryPage() {
       }
     } catch (error) {
       console.error('Failed to join room:', error);
-      alert('방 입장에 실패했습니다: ' + (error.message || '실시간 서버 연결 실패'));
+      // 💡 오류 Toast
+      showToast('방 입장에 실패했습니다. 실시간 서버 연결을 확인해주세요.', 'error');
     } finally {
       setLoading(false);
     }
@@ -196,7 +174,7 @@ function GalleryPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Study Rooms</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                안녕하세요, <span className="font-semibold text-purple-600 dark:text-purple-400">{userNickname}</span>님
+                안녕하세요, <span className="font-semibold text-blue-600 dark:text-blue-400">{userNickname}</span>님
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -211,7 +189,7 @@ function GalleryPage() {
               <button
                 onClick={() => setShowCreateModal(true)}
                 disabled={loading}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-5 h-5" />
                 방 만들기
@@ -229,18 +207,19 @@ function GalleryPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 💡 로딩 상태일 때 Bouncing Loader 표시 */}
         {loading && (
           <div className="text-center py-8">
-            <p className="text-gray-500 dark:text-gray-400">로딩 중...</p>
+            <BouncingLoader /> 
           </div>
         )}
-        
+
         {!loading && rooms.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {rooms.map((room) => (
-              <RoomCard 
-                key={room.id} 
-                room={room} 
+              <RoomCard
+                key={room.id}
+                room={room}
                 onClick={() => handleJoinRoom(room.id)}
                 disabled={loading}
               />
@@ -251,7 +230,7 @@ function GalleryPage() {
             <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">현재 활성화된 공부방이 없습니다</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold"
             >
               첫 번째 방을 만들어보세요!
             </button>
@@ -259,56 +238,26 @@ function GalleryPage() {
         ) : null}
       </main>
 
+      {/* CreateRoomModal 연동 */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">새 공부방 만들기</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  방 제목
-                </label>
-                <input
-                  type="text"
-                  value={roomTitle}
-                  onChange={(e) => setRoomTitle(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !loading && handleCreateRoom()}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="예: 조용히 같이 공부해요"
-                  autoFocus
-                  disabled={loading}
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setRoomTitle('');
-                  }}
-                  disabled={loading}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleCreateRoom}
-                  disabled={loading || !roomTitle.trim()}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? '생성 중...' : '만들기'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CreateRoomModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreateRoom}
+          ownerId={user?.id}
+          ownerNickname={user?.user_metadata?.nickname || '익명'}
+        />
       )}
     </div>
   );
 }
 
 function RoomCard({ room, onClick, disabled }) {
-  const emojis = ['🔥', '📚', '🌙', '☕', '🎯', '✨', '🚀', '💪'];
-  const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+  const displayContent = room.coverImageUrl ? (
+    <img src={room.coverImageUrl} alt={`${room.title} cover`} className="w-full h-full object-cover" />
+  ) : (
+    <span className="text-6xl">{room.emoji || '📚'}</span>
+  );
 
   return (
     <div
@@ -317,13 +266,13 @@ function RoomCard({ room, onClick, disabled }) {
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       }`}
     >
-      <div className="h-40 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-200">
-        {emoji}
+      {/* 💡 RoomCard 배경 그라데이션을 블루 계열로 통일 */}
+      <div className="h-40 bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center transition-transform duration-200">
+        {displayContent}
       </div>
 
       <div className="p-5">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">{room.name}</h3>
-        
         <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center gap-1">
             <Users className="w-4 h-4" />
@@ -334,7 +283,6 @@ function RoomCard({ room, onClick, disabled }) {
             <span>활성</span>
           </div>
         </div>
-
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             방장: {room.ownerNickname || room.profiles?.nickname || 'Unknown'}

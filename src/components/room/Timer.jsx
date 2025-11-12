@@ -1,4 +1,4 @@
-import { Play, Pause, RotateCcw, Clock, Edit2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Clock, Edit2, Maximize, Minimize } from 'lucide-react';
 import useTimer from '../../hooks/useTimer';
 import { useState, useEffect, useRef } from 'react';
 import socketService from '../../services/socket';
@@ -6,7 +6,8 @@ import studySessionService from '../../services/studySessionService';
 import useRoomStore from '../../store/roomStore';
 import useAuthStore from '../../store/authStore';
 
-function Timer({ roomId }) {
+// 💡 onToggleFocus와 isFocusMode props 추가
+function Timer({ roomId, onToggleFocus, isFocusMode }) {
   const { minutes, seconds, isRunning, progress, start, pause, reset, setTime, setTimerState } = useTimer(25);
   const [showPresets, setShowPresets] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -22,7 +23,8 @@ function Timer({ roomId }) {
   useEffect(() => {
     // 타이머 동기화 이벤트 수신
     socketService.onTimerSync((timerData) => {
-      setTimerState(timerData.minutes, timerData.seconds, timerData.isRunning, timerData.totalSeconds);
+      // 💡 newTotalSeconds를 setTimerState에 전달하도록 수정 필요 (useTimer 훅 업데이트에 맞춤)
+      setTimerState(timerData.minutes, timerData.seconds, timerData.isRunning, timerData.totalSeconds); 
     });
 
     return () => {
@@ -35,7 +37,8 @@ function Timer({ roomId }) {
     const recordStudyTime = async () => {
       // 타이머가 0이 되고, 이전에 실행 중이었던 경우
       if (minutes === 0 && seconds === 0 && startTimeRef.current && !isRunning) {
-        const studiedMinutes = initialMinutesRef.current;
+        // initialMinutesRef.current는 분 단위로 유지
+        const studiedMinutes = initialMinutesRef.current; 
         
         try {
           // DB에 공부 세션 기록
@@ -86,7 +89,7 @@ function Timer({ roomId }) {
       
       // 타이머 시작 시간 기록
       startTimeRef.current = Date.now();
-      initialMinutesRef.current = minutes;
+      initialMinutesRef.current = minutes; // 현재 남은 분을 기록
     }
   };
 
@@ -99,7 +102,8 @@ function Timer({ roomId }) {
 
   const handleReset = () => {
     if (isOwner) {
-      reset();
+      // 훅의 reset은 initialMinutes로 돌아가지만, 소켓은 명시적으로 25분을 보냅니다.
+      reset(); 
       socketService.timerReset(roomId, 25);
       
       // 리셋 시 시작 시간 초기화
@@ -133,31 +137,54 @@ function Timer({ roomId }) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">타이머</h2>
-        {isOwner ? (
+    // 💡 1. 집중 모드일 때 전체 화면 스타일 적용
+    <div 
+      className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 ${
+        isFocusMode ? 'w-full h-full flex flex-col justify-center items-center' : ''
+      }`}
+    >
+      <div className={`flex items-center justify-between ${isFocusMode ? 'w-full max-w-xl' : 'mb-4'}`}>
+        <h2 className={`font-semibold ${isFocusMode ? 'text-2xl' : 'text-lg'} text-gray-900 dark:text-white`}>
+          타이머
+        </h2>
+        
+        <div className='flex items-center gap-3'>
+          {/* 💡 2. 집중 모드 토글 버튼 */}
           <button
-            onClick={() => setShowPresets(!showPresets)}
-            className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+            onClick={onToggleFocus}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title={isFocusMode ? "집중 모드 종료" : "집중 모드 시작"}
           >
-            <Clock className="w-4 h-4" />
-            시간 설정
+            {isFocusMode ? (
+              <Minimize className="w-5 h-5 text-gray-900 dark:text-white" />
+            ) : (
+              <Maximize className="w-5 h-5 text-gray-900 dark:text-white" />
+            )}
           </button>
-        ) : (
-          <span className="text-xs text-gray-500 dark:text-gray-400">방장만 컨트롤 가능</span>
-        )}
+          
+          {isOwner ? (
+            <button
+              onClick={() => setShowPresets(!showPresets)}
+              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+            >
+              <Clock className="w-4 h-4" />
+              시간 설정
+            </button>
+          ) : (
+            <span className="text-xs text-gray-500 dark:text-gray-400">방장만 컨트롤 가능</span>
+          )}
+        </div>
       </div>
 
-      {/* 프리셋 버튼들 */}
-      {showPresets && isOwner && (
+      {/* 프리셋 버튼들 (집중 모드에서는 숨김) */}
+      {showPresets && isOwner && !isFocusMode && (
         <div className="mb-6 space-y-3">
           <div className="grid grid-cols-3 gap-2">
             {presets.map((preset) => (
               <button
                 key={preset.label}
                 onClick={() => handleSetTime(preset.minutes)}
-                className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900 hover:text-purple-700 dark:hover:text-purple-300 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg transition-colors"
               >
                 {preset.label}
               </button>
@@ -168,7 +195,7 @@ function Timer({ roomId }) {
           {!showCustomInput ? (
             <button
               onClick={() => setShowCustomInput(true)}
-              className="w-full px-4 py-2 text-sm border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 text-sm border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               <Edit2 className="w-4 h-4" />
               직접 입력
@@ -183,12 +210,12 @@ function Timer({ roomId }) {
                 placeholder="분 (1-180)"
                 min="1"
                 max="180"
-                className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
               <button
                 onClick={handleCustomTime}
-                className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
               >
                 설정
               </button>
@@ -207,8 +234,8 @@ function Timer({ roomId }) {
       )}
 
       {/* 타이머 디스플레이 */}
-      <div className="flex flex-col items-center justify-center py-12">
-        <div className="text-7xl font-bold text-gray-900 dark:text-white mb-8 font-mono">
+      <div className={`flex flex-col items-center justify-center ${isFocusMode ? 'py-20' : 'py-12'}`}>
+        <div className={`font-bold text-gray-900 dark:text-white mb-8 font-mono ${isFocusMode ? 'text-9xl md:text-[160px]' : 'text-7xl'}`}>
           {formatTime(minutes)}:{formatTime(seconds)}
         </div>
 
@@ -222,7 +249,7 @@ function Timer({ roomId }) {
 
         {/* 완료 메시지 */}
         {minutes === 0 && seconds === 0 && !isRunning && startTimeRef.current && (
-          <div className="mb-6 flex items-center gap-2 text-purple-600 dark:text-purple-400">
+          <div className="mb-6 flex items-center gap-2 text-blue-600 dark:text-blue-400">
             <span className="text-sm font-medium">✅ 공부 시간이 기록되었습니다!</span>
           </div>
         )}
@@ -233,7 +260,7 @@ function Timer({ roomId }) {
             <button
               onClick={handleStart}
               disabled={!isOwner || (minutes === 0 && seconds === 0)}
-              className="px-8 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Play className="w-5 h-5" />
               시작
@@ -261,10 +288,10 @@ function Timer({ roomId }) {
       </div>
 
       {/* 진행률 바 */}
-      <div className="mt-6">
+      <div className={`mt-6 ${isFocusMode ? 'w-full max-w-lg' : ''}`}>
         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-purple-600 transition-all duration-1000"
+            className="h-full bg-blue-600 transition-all duration-1000"
             style={{
               width: `${progress}%`,
             }}

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 class RoomService {
-  // 방 생성
+  // ✅ 방 생성 (이모지 + 커버 이미지 포함)
   async createRoom(roomData) {
     try {
       const { data, error } = await supabase
@@ -12,6 +12,9 @@ class RoomService {
             description: roomData.description || '',
             owner_id: roomData.ownerId,
             max_participants: roomData.maxParticipants || 6,
+            emoji: roomData.emoji || '📚', // ✅ 기본 이모지
+            cover_image_url: roomData.coverImageUrl || null, // ✅ 이미지 URL
+            is_active: true,
           },
         ])
         .select()
@@ -19,7 +22,7 @@ class RoomService {
 
       if (error) throw error;
 
-      // 방장을 참여자 목록에 추가
+      // ✅ 방장을 참여자 목록에 자동 추가
       await this.addParticipant(
         data.id,
         roomData.ownerId,
@@ -34,7 +37,7 @@ class RoomService {
     }
   }
 
-  // 활성 방 목록 조회
+  // ✅ 활성화된 방 목록 조회 (이모지/커버 이미지 포함)
   async getActiveRooms() {
     try {
       const { data, error } = await supabase
@@ -48,21 +51,22 @@ class RoomService {
 
       if (error) throw error;
 
-      // owner 정보를 한 번에 조회 (성능 최적화)
+      // owner 정보를 한번에 조회
       const ownerIds = [...new Set(data.map(room => room.owner_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, nickname')
         .in('id', ownerIds);
 
-      // 프로필 맵 생성
       const profileMap = new Map(profiles?.map(p => [p.id, p.nickname]) || []);
 
-      // 데이터 가공
+      // ✅ 이모지와 이미지 포함해서 리턴
       const roomsWithDetails = data.map((room) => ({
         ...room,
         participantCount: room.room_participants?.length || 0,
         ownerNickname: profileMap.get(room.owner_id) || 'Unknown',
+        emoji: room.emoji || '📚',
+        coverImageUrl: room.cover_image_url || null,
       }));
 
       return roomsWithDetails;
@@ -72,7 +76,7 @@ class RoomService {
     }
   }
 
-  // 특정 방 조회 (참여자 정보 포함)
+  // ✅ 특정 방 조회
   async getRoom(roomId) {
     try {
       const { data, error } = await supabase
@@ -92,7 +96,6 @@ class RoomService {
 
       if (error) throw error;
 
-      // 방장 닉네임 조회
       const { data: ownerProfile } = await supabase
         .from('profiles')
         .select('nickname')
@@ -102,6 +105,8 @@ class RoomService {
       return {
         ...data,
         ownerNickname: ownerProfile?.nickname || 'Unknown',
+        emoji: data.emoji || '📚',
+        cover_image_url: data.cover_image_url || null,
       };
     } catch (error) {
       console.error('방 조회 오류:', error);
@@ -112,7 +117,6 @@ class RoomService {
   // 참여자 추가
   async addParticipant(roomId, userId, nickname, isOwner = false) {
     try {
-      // 이미 참여 중인지 확인
       const { data: existing, error: checkError } = await supabase
         .from('room_participants')
         .select('id')
@@ -120,23 +124,16 @@ class RoomService {
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
+      if (checkError && checkError.code !== 'PGRST116') throw checkError;
+      if (existing) return existing;
 
-      if (existing) {
-        console.log('이미 참여 중인 사용자');
-        return existing;
-      }
-
-      // 새로 추가
       const { data, error } = await supabase
         .from('room_participants')
         .insert([
           {
             room_id: roomId,
             user_id: userId,
-            nickname: nickname,
+            nickname,
             is_owner: isOwner,
           },
         ])
@@ -151,7 +148,6 @@ class RoomService {
     }
   }
 
-  // 참여자 제거
   async removeParticipant(roomId, userId) {
     try {
       const { error } = await supabase
@@ -162,14 +158,12 @@ class RoomService {
 
       if (error) throw error;
 
-      // 남은 참여자 확인
-      const { data: remainingParticipants } = await supabase
+      const { data: remaining } = await supabase
         .from('room_participants')
         .select('id')
         .eq('room_id', roomId);
 
-      // 참여자가 없으면 방 비활성화
-      if (!remainingParticipants || remainingParticipants.length === 0) {
+      if (!remaining || remaining.length === 0) {
         await this.deactivateRoom(roomId);
       }
     } catch (error) {
@@ -178,7 +172,6 @@ class RoomService {
     }
   }
 
-  // 방 비활성화 (참여자가 0명일 때)
   async deactivateRoom(roomId) {
     try {
       const { error } = await supabase
@@ -193,10 +186,8 @@ class RoomService {
     }
   }
 
-  // 방 삭제 (방장만 가능)
   async deleteRoom(roomId, userId) {
     try {
-      // 방장 확인
       const { data: room, error: roomError } = await supabase
         .from('rooms')
         .select('owner_id')
@@ -204,12 +195,9 @@ class RoomService {
         .single();
 
       if (roomError) throw roomError;
-
-      if (room.owner_id !== userId) {
+      if (room.owner_id !== userId)
         throw new Error('방장만 방을 삭제할 수 있습니다');
-      }
 
-      // 방 삭제 (CASCADE로 참여자, 채팅도 자동 삭제)
       const { error: deleteError } = await supabase
         .from('rooms')
         .delete()
@@ -224,7 +212,6 @@ class RoomService {
     }
   }
 
-  // 현재 재생 중인 영상 업데이트
   async updateCurrentVideo(roomId, videoId) {
     try {
       const { error } = await supabase
@@ -242,7 +229,6 @@ class RoomService {
     }
   }
 
-  // 타이머 시간 업데이트
   async updateTimer(roomId, minutes) {
     try {
       const { error } = await supabase
@@ -260,10 +246,8 @@ class RoomService {
     }
   }
 
-  // 방장 권한 이전
   async transferOwnership(roomId, newOwnerId) {
     try {
-      // 1. 방의 owner_id 변경
       const { error: roomError } = await supabase
         .from('rooms')
         .update({ owner_id: newOwnerId })
@@ -271,7 +255,6 @@ class RoomService {
 
       if (roomError) throw roomError;
 
-      // 2. 모든 참여자의 is_owner를 false로
       const { error: resetError } = await supabase
         .from('room_participants')
         .update({ is_owner: false })
@@ -279,7 +262,6 @@ class RoomService {
 
       if (resetError) throw resetError;
 
-      // 3. 새 방장의 is_owner를 true로
       const { error: newOwnerError } = await supabase
         .from('room_participants')
         .update({ is_owner: true })
