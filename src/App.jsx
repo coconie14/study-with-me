@@ -1,13 +1,15 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import ProfilePage from './pages/ProfilePage';
 import { useEffect } from 'react';
 import IntroPage from './pages/IntroPage';
 import LoginPage from './pages/LoginPage';
 import GalleryPage from './pages/GalleryPage';
 import RoomPage from './pages/RoomPage';
+import ProfilePage from './pages/ProfilePage';
 import useAuthStore from './store/authStore';
-import useThemeStore from './store/themeStore'; // 👈 추가
+import useThemeStore from './store/themeStore';
 import { auth } from './lib/supabase';
+import notificationService from './services/notificationService';
+import { ToastProvider } from './contexts/ToastProvider';
 
 // 보호된 라우트 컴포넌트
 function ProtectedRoute({ children }) {
@@ -33,11 +35,11 @@ function ProtectedRoute({ children }) {
 
 function App() {
   const { setUser, setSession, setLoading, initialize } = useAuthStore();
-  const { initializeTheme } = useThemeStore(); // 👈 추가
+  const { initializeTheme } = useThemeStore();
 
   useEffect(() => {
-    // 테마 초기화 (localStorage에서 불러오기)
-    initializeTheme(); // 👈 추가
+    // 테마 초기화
+    initializeTheme();
     
     // 초기 인증 상태 확인
     initialize();
@@ -53,45 +55,65 @@ function App() {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [setUser, setSession, setLoading, initialize, initializeTheme]); // 👈 의존성 추가
+  }, [setUser, setSession, setLoading, initialize, initializeTheme]);
+
+  // 🔔 알림 권한 요청 (로그인 후 2초 뒤)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      notificationService.requestPermission();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 🔔 창 포커스 시 깜빡임 중지
+  useEffect(() => {
+    const handleFocus = () => {
+      notificationService.stopBlinkTitle();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Routes>
-          {/* 공개 라우트 */}
-          <Route path="/" element={<IntroPage />} />
-          <Route path="/login" element={<LoginPage />} />
+    <ToastProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+          <Routes>
+            {/* 공개 라우트 */}
+            <Route path="/" element={<IntroPage />} />
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* 보호된 라우트 */}
-          <Route 
-            path="/gallery" 
-            element={
-              <ProtectedRoute>
-                <GalleryPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/room/:roomId" 
-            element={
-              <ProtectedRoute>
-                <RoomPage />
-              </ProtectedRoute>
-            } 
-          />
-        </Routes>
-      </div>
-    </Router>
-    
+            {/* 보호된 라우트 */}
+            <Route 
+              path="/gallery" 
+              element={
+                <ProtectedRoute>
+                  <GalleryPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/room/:roomId" 
+              element={
+                <ProtectedRoute>
+                  <RoomPage />
+                </ProtectedRoute>
+              } 
+            />
+          </Routes>
+        </div>
+      </Router>
+    </ToastProvider>
   );
 }
 

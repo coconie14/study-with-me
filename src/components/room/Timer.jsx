@@ -1,14 +1,16 @@
-import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
+import { Play, Pause, RotateCcw, Clock, Edit2 } from 'lucide-react';
 import useTimer from '../../hooks/useTimer';
 import { useState, useEffect, useRef } from 'react';
 import socketService from '../../services/socket';
-import studySessionService from '../../services/StudySessionService';
+import studySessionService from '../../services/studySessionService';
 import useRoomStore from '../../store/roomStore';
 import useAuthStore from '../../store/authStore';
 
 function Timer({ roomId }) {
   const { minutes, seconds, isRunning, progress, start, pause, reset, setTime, setTimerState } = useTimer(25);
   const [showPresets, setShowPresets] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customMinutes, setCustomMinutes] = useState('');
   const { currentRoom } = useRoomStore();
   const { user } = useAuthStore();
   const isOwner = currentRoom?.participants?.find(p => p.isOwner && p.id === socketService.getSocket()?.id);
@@ -31,7 +33,7 @@ function Timer({ roomId }) {
   // 타이머 완료 감지 및 공부 시간 기록
   useEffect(() => {
     const recordStudyTime = async () => {
-      // 타이머가 0이 되고, 이전에 실행 중이었던 경우 (완료된 경우)
+      // 타이머가 0이 되고, 이전에 실행 중이었던 경우
       if (minutes === 0 && seconds === 0 && startTimeRef.current && !isRunning) {
         const studiedMinutes = initialMinutesRef.current;
         
@@ -45,7 +47,7 @@ function Timer({ roomId }) {
           
           console.log(`✅ 공부 시간 기록: ${studiedMinutes}분`);
           
-          // 알림 표시 (선택사항)
+          // 알림 표시
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('공부 완료! 🎉', {
               body: `${studiedMinutes}분 동안 집중했습니다!`,
@@ -64,10 +66,10 @@ function Timer({ roomId }) {
     recordStudyTime();
   }, [minutes, seconds, isRunning, user, roomId]);
 
-  // 시간 포맷팅 (두 자리로 표시)
+  // 시간 포맷팅
   const formatTime = (num) => String(num).padStart(2, '0');
 
-  // 프리셋 시간들 (뽀모도로, 짧은 휴식, 긴 휴식)
+  // 프리셋 시간들
   const presets = [
     { label: '뽀모도로', minutes: 25 },
     { label: '짧은 휴식', minutes: 5 },
@@ -118,6 +120,18 @@ function Timer({ roomId }) {
     }
   };
 
+  const handleCustomTime = () => {
+    const mins = parseInt(customMinutes);
+    if (isNaN(mins) || mins < 1 || mins > 180) {
+      alert('1분에서 180분 사이의 시간을 입력해주세요');
+      return;
+    }
+    
+    handleSetTime(mins);
+    setCustomMinutes('');
+    setShowCustomInput(false);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
       <div className="flex items-center justify-between mb-4">
@@ -137,16 +151,58 @@ function Timer({ roomId }) {
 
       {/* 프리셋 버튼들 */}
       {showPresets && isOwner && (
-        <div className="grid grid-cols-3 gap-2 mb-6">
-          {presets.map((preset) => (
+        <div className="mb-6 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {presets.map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => handleSetTime(preset.minutes)}
+                className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900 hover:text-purple-700 dark:hover:text-purple-300 rounded-lg transition-colors"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 커스텀 시간 입력 */}
+          {!showCustomInput ? (
             <button
-              key={preset.label}
-              onClick={() => handleSetTime(preset.minutes)}
-              className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900 hover:text-purple-700 dark:hover:text-purple-300 rounded-lg transition-colors"
+              onClick={() => setShowCustomInput(true)}
+              className="w-full px-4 py-2 text-sm border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              {preset.label}
+              <Edit2 className="w-4 h-4" />
+              직접 입력
             </button>
-          ))}
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={customMinutes}
+                onChange={(e) => setCustomMinutes(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleCustomTime()}
+                placeholder="분 (1-180)"
+                min="1"
+                max="180"
+                className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                autoFocus
+              />
+              <button
+                onClick={handleCustomTime}
+                className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                설정
+              </button>
+              <button
+                onClick={() => {
+                  setShowCustomInput(false);
+                  setCustomMinutes('');
+                }}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          )}
         </div>
       )}
 

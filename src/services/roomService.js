@@ -48,23 +48,22 @@ class RoomService {
 
       if (error) throw error;
 
-      // 참여자 수 계산 및 방장 정보 조회
-      const roomsWithDetails = await Promise.all(
-        data.map(async (room) => {
-          // 방장 닉네임 조회
-          const { data: ownerProfile } = await supabase
-            .from('profiles')
-            .select('nickname')
-            .eq('id', room.owner_id)
-            .single();
+      // owner 정보를 한 번에 조회 (성능 최적화)
+      const ownerIds = [...new Set(data.map(room => room.owner_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, nickname')
+        .in('id', ownerIds);
 
-          return {
-            ...room,
-            participantCount: room.room_participants?.length || 0,
-            ownerNickname: ownerProfile?.nickname || 'Unknown',
-          };
-        })
-      );
+      // 프로필 맵 생성
+      const profileMap = new Map(profiles?.map(p => [p.id, p.nickname]) || []);
+
+      // 데이터 가공
+      const roomsWithDetails = data.map((room) => ({
+        ...room,
+        participantCount: room.room_participants?.length || 0,
+        ownerNickname: profileMap.get(room.owner_id) || 'Unknown',
+      }));
 
       return roomsWithDetails;
     } catch (error) {
@@ -171,7 +170,7 @@ class RoomService {
 
       // 참여자가 없으면 방 비활성화
       if (!remainingParticipants || remainingParticipants.length === 0) {
-        await this.deleteRoom(roomId);
+        await this.deactivateRoom(roomId);
       }
     } catch (error) {
       console.error('참여자 제거 오류:', error);
@@ -179,8 +178,8 @@ class RoomService {
     }
   }
 
-  // 방 삭제 (비활성화)
-  async deleteRoom(roomId) {
+  // 방 비활성화 (참여자가 0명일 때)
+  async deactivateRoom(roomId) {
     try {
       const { error } = await supabase
         .from('rooms')
@@ -188,6 +187,37 @@ class RoomService {
         .eq('id', roomId);
 
       if (error) throw error;
+    } catch (error) {
+      console.error('방 비활성화 오류:', error);
+      throw error;
+    }
+  }
+
+  // 방 삭제 (방장만 가능)
+  async deleteRoom(roomId, userId) {
+    try {
+      // 방장 확인
+      const { data: room, error: roomError } = await supabase
+        .from('rooms')
+        .select('owner_id')
+        .eq('id', roomId)
+        .single();
+
+      if (roomError) throw roomError;
+
+      if (room.owner_id !== userId) {
+        throw new Error('방장만 방을 삭제할 수 있습니다');
+      }
+
+      // 방 삭제 (CASCADE로 참여자, 채팅도 자동 삭제)
+      const { error: deleteError } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', roomId);
+
+      if (deleteError) throw deleteError;
+
+      return { success: true };
     } catch (error) {
       console.error('방 삭제 오류:', error);
       throw error;
@@ -259,36 +289,6 @@ class RoomService {
       if (newOwnerError) throw newOwnerError;
     } catch (error) {
       console.error('방장 권한 이전 오류:', error);
-      throw error;
-    }
-  }
-  // 방 삭제 (방장만 가능)
-  async deleteRoom(roomId, userId) {
-    try {
-      // 방장 확인
-      const { data: room, error: roomError } = await supabase
-        .from('rooms')
-        .select('owner_id')
-        .eq('id', roomId)
-        .single();
-
-      if (roomError) throw roomError;
-
-      if (room.owner_id !== userId) {
-        throw new Error('방장만 방을 삭제할 수 있습니다');
-      }
-
-      // 방 삭제 (CASCADE로 참여자, 채팅도 자동 삭제)
-      const { error: deleteError } = await supabase
-        .from('rooms')
-        .delete()
-        .eq('id', roomId);
-
-      if (deleteError) throw deleteError;
-
-      return { success: true };
-    } catch (error) {
-      console.error('방 삭제 오류:', error);
       throw error;
     }
   }
