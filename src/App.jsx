@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ProfilePage from './pages/ProfilePage';
 import { useEffect } from 'react';
 import IntroPage from './pages/IntroPage';
 import LoginPage from './pages/LoginPage';
@@ -71,6 +72,14 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route 
             path="/room/:roomId" 
             element={
@@ -82,6 +91,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+    
   );
 }
 

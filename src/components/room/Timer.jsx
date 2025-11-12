@@ -1,14 +1,21 @@
 import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
 import useTimer from '../../hooks/useTimer';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import socketService from '../../services/socket';
+import studySessionService from '../../services/StudySessionService';
 import useRoomStore from '../../store/roomStore';
+import useAuthStore from '../../store/authStore';
 
 function Timer({ roomId }) {
   const { minutes, seconds, isRunning, progress, start, pause, reset, setTime, setTimerState } = useTimer(25);
   const [showPresets, setShowPresets] = useState(false);
   const { currentRoom } = useRoomStore();
+  const { user } = useAuthStore();
   const isOwner = currentRoom?.participants?.find(p => p.isOwner && p.id === socketService.getSocket()?.id);
+  
+  // 타이머 시작 시간 기록용
+  const startTimeRef = useRef(null);
+  const initialMinutesRef = useRef(25);
 
   useEffect(() => {
     // 타이머 동기화 이벤트 수신
@@ -20,6 +27,42 @@ function Timer({ roomId }) {
       socketService.off('timer-sync');
     };
   }, [setTimerState]);
+
+  // 타이머 완료 감지 및 공부 시간 기록
+  useEffect(() => {
+    const recordStudyTime = async () => {
+      // 타이머가 0이 되고, 이전에 실행 중이었던 경우 (완료된 경우)
+      if (minutes === 0 && seconds === 0 && startTimeRef.current && !isRunning) {
+        const studiedMinutes = initialMinutesRef.current;
+        
+        try {
+          // DB에 공부 세션 기록
+          await studySessionService.saveSession(
+            user.id,
+            roomId,
+            studiedMinutes
+          );
+          
+          console.log(`✅ 공부 시간 기록: ${studiedMinutes}분`);
+          
+          // 알림 표시 (선택사항)
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('공부 완료! 🎉', {
+              body: `${studiedMinutes}분 동안 집중했습니다!`,
+              icon: '/favicon.ico'
+            });
+          }
+          
+          // 기록 완료 후 초기화
+          startTimeRef.current = null;
+        } catch (error) {
+          console.error('Failed to record study session:', error);
+        }
+      }
+    };
+
+    recordStudyTime();
+  }, [minutes, seconds, isRunning, user, roomId]);
 
   // 시간 포맷팅 (두 자리로 표시)
   const formatTime = (num) => String(num).padStart(2, '0');
@@ -38,6 +81,10 @@ function Timer({ roomId }) {
     if (isOwner) {
       start();
       socketService.timerStart(roomId);
+      
+      // 타이머 시작 시간 기록
+      startTimeRef.current = Date.now();
+      initialMinutesRef.current = minutes;
     }
   };
 
@@ -52,6 +99,10 @@ function Timer({ roomId }) {
     if (isOwner) {
       reset();
       socketService.timerReset(roomId, 25);
+      
+      // 리셋 시 시작 시간 초기화
+      startTimeRef.current = null;
+      initialMinutesRef.current = 25;
     }
   };
 
@@ -60,6 +111,10 @@ function Timer({ roomId }) {
       setTime(newMinutes);
       socketService.timerReset(roomId, newMinutes);
       setShowPresets(false);
+      
+      // 시간 변경 시 초기화
+      startTimeRef.current = null;
+      initialMinutesRef.current = newMinutes;
     }
   };
 
@@ -87,7 +142,7 @@ function Timer({ roomId }) {
             <button
               key={preset.label}
               onClick={() => handleSetTime(preset.minutes)}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-purple-100 hover:text-purple-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900 hover:text-purple-700 dark:hover:text-purple-300 rounded-lg transition-colors"
             >
               {preset.label}
             </button>
@@ -97,15 +152,22 @@ function Timer({ roomId }) {
 
       {/* 타이머 디스플레이 */}
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="text-7xl font-bold text-gray-900 mb-8 font-mono">
+        <div className="text-7xl font-bold text-gray-900 dark:text-white mb-8 font-mono">
           {formatTime(minutes)}:{formatTime(seconds)}
         </div>
 
         {/* 진행 상태 표시 */}
         {isRunning && (
-          <div className="mb-6 flex items-center gap-2 text-green-600">
-            <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+          <div className="mb-6 flex items-center gap-2 text-green-600 dark:text-green-400">
+            <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></div>
             <span className="text-sm font-medium">진행 중</span>
+          </div>
+        )}
+
+        {/* 완료 메시지 */}
+        {minutes === 0 && seconds === 0 && !isRunning && startTimeRef.current && (
+          <div className="mb-6 flex items-center gap-2 text-purple-600 dark:text-purple-400">
+            <span className="text-sm font-medium">✅ 공부 시간이 기록되었습니다!</span>
           </div>
         )}
 
@@ -134,7 +196,7 @@ function Timer({ roomId }) {
           <button
             onClick={handleReset}
             disabled={!isOwner}
-            className="px-8 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RotateCcw className="w-5 h-5" />
             리셋
@@ -144,7 +206,7 @@ function Timer({ roomId }) {
 
       {/* 진행률 바 */}
       <div className="mt-6">
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
             className="h-full bg-purple-600 transition-all duration-1000"
             style={{

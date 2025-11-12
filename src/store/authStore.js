@@ -18,6 +18,7 @@ const useAuthStore = create((set) => ({
   // 초기화
   initialize: async () => {
     try {
+      // auth 헬퍼 사용 (이미 올바른 형식으로 반환됨)
       const { session } = await auth.getSession();
       const { user } = await auth.getCurrentUser();
       
