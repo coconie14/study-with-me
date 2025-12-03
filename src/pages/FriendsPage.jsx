@@ -4,7 +4,7 @@ import { ArrowLeft, Search, UserPlus, Check, X, Clock, Users } from 'lucide-reac
 import friendService from '../services/friendService';
 import useAuthStore from '../store/authStore';
 import { useToast } from '../contexts/ToastProvider';
-import { useFriendRequests } from '../hooks/Usefriendrequests';
+import { useFriendRequests } from '../hooks/useFriendRequests';
 
 function FriendsPage() {
   const navigate = useNavigate();
