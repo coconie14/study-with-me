@@ -11,7 +11,7 @@ import CreateRoomModal from '../components/room/CreateRoomModal';
 import { useToast } from '../contexts/ToastProvider';
 import BouncingLoader from '../components/common/BouncingLoader';
 // 💡 친구 요청 알림 훅 추가 (유일한 새 import)
-import { useFriendRequests } from '../hooks/Usefriendrequests';
+import { useFriendRequests } from '../hooks/useFriendRequests';
 
 function GalleryPage() {
   const navigate = useNavigate();
