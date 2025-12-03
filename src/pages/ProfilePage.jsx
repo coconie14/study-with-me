@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Edit2, Calendar, Clock, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Edit2, Calendar, Clock, TrendingUp, Users } from 'lucide-react';
 import profileService from '../services/profileService';
 import useAuthStore from '../store/authStore';
 import EditProfileModal from '../components/profile/EditProfileModal';
+import FriendComparisonChart from '../components/friends/FriendComparisonChart';
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ function ProfilePage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('stats'); // 'stats' or 'friends'
 
   // 프로필 및 통계 불러오기
   useEffect(() => {
@@ -77,7 +79,7 @@ function ProfilePage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-8">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
-                {/* 💡 아바타 표시 로직 수정: avatar_url이 있으면 사진 표시 */}
+                {/* 아바타 표시 */}
                 <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-blue-400 to-cyan-400">
                   {profile?.avatar_url ? (
                     <img 
@@ -109,7 +111,7 @@ function ProfilePage() {
                 </div>
               </div>
 
-              {/* 편집 버튼: 보라색을 파란색으로 변경 */}
+              {/* 편집 버튼 */}
               <button
                 onClick={() => setShowEditModal(true)}
                 className="flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
@@ -127,99 +129,158 @@ function ProfilePage() {
             )}
           </div>
 
-          {/* 공부 통계 카드 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 총 공부 시간: 보라색을 파란색으로 변경 */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">총 공부 시간</h3>
-              </div>
-              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {Math.floor((profile?.total_study_time || 0) / 60)}h {(profile?.total_study_time || 0) % 60}m
-              </p>
-            </div>
-
-            {/* 완료한 세션 (그대로 유지 - 성과는 녹색이 적절) */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">완료한 세션</h3>
-              </div>
-              <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                {stats?.recentSessions?.length || 0}개
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">최근 7일</p>
-            </div>
-
-            {/* 평균 집중 시간 (블루 톤이 이미 적용되어 있어 유지) */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">평균 집중 시간</h3>
-              </div>
-              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {stats?.recentSessions?.length > 0
-                  ? Math.round(
-                      stats.recentSessions.reduce((sum, s) => sum + s.duration_minutes, 0) /
-                      stats.recentSessions.length
-                    )
-                  : 0}분
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">세션당</p>
+          {/* 탭 네비게이션 */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('stats')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  activeTab === 'stats'
+                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <TrendingUp className="w-5 h-5" />
+                <span>내 통계</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('friends')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  activeTab === 'friends'
+                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                <span>친구 비교</span>
+              </button>
             </div>
           </div>
 
-          {/* 최근 활동 */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              최근 7일 활동
-            </h3>
-            
-            {stats?.recentSessions?.length > 0 ? (
-              <div className="space-y-3">
-                {stats.recentSessions.slice(0, 5).map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* 💡 활동 점을 파란색으로 변경 */}
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          공부 세션 완료
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(session.created_at).toLocaleDateString('ko-KR', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
+          {/* 내 통계 탭 */}
+          {activeTab === 'stats' && (
+            <>
+              {/* 공부 통계 카드 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 총 공부 시간 */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
-                    {/* 💡 세션 시간 텍스트 색상을 파란색으로 변경 */}
-                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                      {session.duration_minutes}분
-                    </span>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">총 공부 시간</h3>
                   </div>
-                ))}
+                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    {Math.floor((profile?.total_study_time || 0) / 60)}h {(profile?.total_study_time || 0) % 60}m
+                  </p>
+                </div>
+
+                {/* 완료한 세션 */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                      <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">완료한 세션</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    {stats?.recentSessions?.length || 0}개
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">최근 7일</p>
+                </div>
+
+                {/* 평균 집중 시간 */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">평균 집중 시간</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    {stats?.recentSessions?.length > 0
+                      ? Math.round(
+                          stats.recentSessions.reduce((sum, s) => sum + s.duration_minutes, 0) /
+                          stats.recentSessions.length
+                        )
+                      : 0}분
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">세션당</p>
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <p>아직 공부 기록이 없습니다</p>
-                <p className="text-sm mt-1">타이머를 완료하면 기록이 저장됩니다</p>
+
+              {/* 최근 활동 */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  최근 7일 활동
+                </h3>
+                
+                {stats?.recentSessions?.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.recentSessions.slice(0, 5).map((session) => (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              공부 세션 완료
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(session.created_at).toLocaleDateString('ko-KR', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                          {session.duration_minutes}분
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p>아직 공부 기록이 없습니다</p>
+                    <p className="text-sm mt-1">타이머를 완료하면 기록이 저장됩니다</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
+
+          {/* 친구 비교 탭 */}
+          {activeTab === 'friends' && (
+            <>
+              {/* 친구 비교 그래프 */}
+              <FriendComparisonChart />
+
+              {/* 친구 관리 버튼 */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                      친구 관리
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      친구를 추가하고 함께 공부하세요
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/friends')}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    친구 페이지로 이동
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </main>
 

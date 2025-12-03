@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Clock, LogOut, User } from 'lucide-react';
+import { Plus, Users, Clock, LogOut, User, UserPlus } from 'lucide-react';
 import socketService from '../services/socket';
 import roomService from '../services/roomService';
 import profileService from '../services/profileService';
@@ -9,9 +9,9 @@ import useAuthStore from '../store/authStore';
 import ThemeToggle from '../components/common/ThemeToggle';
 import CreateRoomModal from '../components/room/CreateRoomModal';
 import { useToast } from '../contexts/ToastProvider';
-// 💡 Bouncing Loader 임포트
 import BouncingLoader from '../components/common/BouncingLoader';
-
+// 💡 친구 요청 알림 훅 추가 (유일한 새 import)
+import { useFriendRequests } from '../hooks/Usefriendrequests';
 
 function GalleryPage() {
   const navigate = useNavigate();
@@ -21,6 +21,9 @@ function GalleryPage() {
 
   const { rooms, setRooms, setCurrentRoom } = useRoomStore();
   const { user, signOut } = useAuthStore();
+
+  // 💡 친구 요청 알림 (새로 추가)
+  const { requestCount, markAsRead } = useFriendRequests();
 
   // 사용자 닉네임
   const userNickname = user?.user_metadata?.nickname || user?.email?.split('@')[0] || 'User';
@@ -52,7 +55,6 @@ function GalleryPage() {
       setRooms(roomList);
     } catch (error) {
       console.error('Failed to load rooms:', error);
-      // 💡 오류 Toast
       showToast('방 목록을 불러오는 데 실패했습니다.', 'error');
     }
   };
@@ -98,7 +100,6 @@ function GalleryPage() {
       navigate(`/room/${room.id}`);
     } catch (error) {
       console.error('Failed to create room:', error);
-      // 💡 오류 Toast
       showToast('방 생성에 실패했습니다: ' + (error.message || error.error || '알 수 없는 오류'), 'error');
     } finally {
       setLoading(false);
@@ -110,7 +111,6 @@ function GalleryPage() {
     setLoading(true);
     try {
       const room = await roomService.getRoom(roomId);
-      // 💡 alert() 대체
       if (!room) return showToast('존재하지 않는 방입니다.', 'error');
       if (!room.is_active) return showToast('비활성화된 방입니다.', 'error');
 
@@ -129,7 +129,6 @@ function GalleryPage() {
         navigate(`/room/${roomId}`);
       } catch (socketError) {
         console.warn('Socket room not found. Recreating room.', socketError);
-        // Socket 서버에 방이 없으면 재생성 (DB 상태를 기반으로 복구)
         const socketResponse = await socketService.createRoom({
           title: room.name,
           nickname: userNickname,
@@ -151,7 +150,6 @@ function GalleryPage() {
       }
     } catch (error) {
       console.error('Failed to join room:', error);
-      // 💡 오류 Toast
       showToast('방 입장에 실패했습니다. 실시간 서버 연결을 확인해주세요.', 'error');
     } finally {
       setLoading(false);
@@ -164,6 +162,12 @@ function GalleryPage() {
       socketService.disconnect();
       navigate('/login');
     }
+  };
+
+  // 💡 친구 페이지로 이동 (새로 추가)
+  const handleGoToFriends = () => {
+    markAsRead();
+    navigate('/friends');
   };
 
   return (
@@ -179,6 +183,21 @@ function GalleryPage() {
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
+              
+              {/* 💡 친구 버튼 추가 (새로운 버튼) */}
+              <button
+                onClick={handleGoToFriends}
+                className="relative p-3 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                title="친구"
+              >
+                <UserPlus className="w-5 h-5" />
+                {requestCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {requestCount > 9 ? '9+' : requestCount}
+                  </span>
+                )}
+              </button>
+
               <button
                 onClick={() => navigate('/profile')}
                 className="p-3 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -207,7 +226,6 @@ function GalleryPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 💡 로딩 상태일 때 Bouncing Loader 표시 */}
         {loading && (
           <div className="text-center py-8">
             <BouncingLoader /> 
@@ -238,7 +256,6 @@ function GalleryPage() {
         ) : null}
       </main>
 
-      {/* CreateRoomModal 연동 */}
       {showCreateModal && (
         <CreateRoomModal
           isOpen={showCreateModal}
@@ -266,7 +283,6 @@ function RoomCard({ room, onClick, disabled }) {
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       }`}
     >
-      {/* 💡 RoomCard 배경 그라데이션을 블루 계열로 통일 */}
       <div className="h-40 bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center transition-transform duration-200">
         {displayContent}
       </div>

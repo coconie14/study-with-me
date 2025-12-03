@@ -1,8 +1,6 @@
 import { io } from 'socket.io-client';
 
 // 환경에 따라 자동 전환
-// 로컬: http://localhost:3001
-// 배포: Railway URL (환경변수에서)
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 class SocketService {
@@ -17,10 +15,13 @@ class SocketService {
       
       this.socket.on('connect', () => {
         console.log('✅ Connected to server:', this.socket.id);
+        // 💡 Socket ID를 전역으로 저장 (roomStore에서 사용)
+        window.__socketId = this.socket.id;
       });
 
       this.socket.on('disconnect', () => {
         console.log('❌ Disconnected from server');
+        window.__socketId = null;
       });
 
       this.socket.on('connect_error', (error) => {
@@ -57,10 +58,23 @@ class SocketService {
     });
   }
 
-  // 방 입장
-  joinRoom(roomId, nickname) {
+  // 💡 방 입장 (userId 추가)
+  joinRoom(roomId, nickname, userId) {
     return new Promise((resolve, reject) => {
-      this.getSocket().emit('join-room', { roomId, nickname }, (response) => {
+      this.getSocket().emit('join-room', { roomId, nickname, userId }, (response) => {
+        if (response.success) {
+          resolve(response);
+        } else {
+          reject(response.error);
+        }
+      });
+    });
+  }
+
+  // 💡 명시적 방 퇴장 (새로 추가)
+  leaveRoom(roomId, nickname) {
+    return new Promise((resolve, reject) => {
+      this.getSocket().emit('leave-room', { roomId, nickname }, (response) => {
         if (response.success) {
           resolve(response);
         } else {
@@ -94,6 +108,11 @@ class SocketService {
 
   timerUpdate(roomId, minutes, seconds) {
     this.getSocket().emit('timer-update', { roomId, minutes, seconds });
+  }
+
+  // 💡 타이머 동기화 요청 (선택 사항)
+  requestTimerSync(roomId) {
+    this.getSocket().emit('request-timer-sync', roomId);
   }
 
   // 미디어 이벤트
@@ -158,6 +177,21 @@ class SocketService {
 
   onRoomDeleted(callback) {
     this.getSocket().on('room-deleted', callback);
+  }
+
+  // 💡 방이 비었을 때 (새로 추가)
+  onRoomEmpty(callback) {
+    this.getSocket().on('room-empty', callback);
+  }
+
+  // 💡 방장 부재 이벤트 (새로 추가)
+  onOwnerAway(callback) {
+    this.getSocket().on('owner-away', callback);
+  }
+
+  // 💡 방장 복귀 이벤트 (선택 사항)
+  onOwnerReturned(callback) {
+    this.getSocket().on('owner-returned', callback);
   }
 
   // 리스너 제거

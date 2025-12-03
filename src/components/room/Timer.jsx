@@ -6,39 +6,139 @@ import studySessionService from '../../services/studySessionService';
 import useRoomStore from '../../store/roomStore';
 import useAuthStore from '../../store/authStore';
 
-// 💡 onToggleFocus와 isFocusMode props 추가
 function Timer({ roomId, onToggleFocus, isFocusMode }) {
-  const { minutes, seconds, isRunning, progress, start, pause, reset, setTime, setTimerState } = useTimer(25);
+  const { currentRoom } = useRoomStore();
+  const { user } = useAuthStore();
+  
+  // 💡 currentRoom의 타이머 상태로 초기화
+  const initialMinutes = currentRoom?.timer?.minutes || 25;
+  
+  const { minutes, seconds, isRunning, progress, start, pause, reset, setTime, setTimerState } = useTimer(initialMinutes);
+  
   const [showPresets, setShowPresets] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customMinutes, setCustomMinutes] = useState('');
-  const { currentRoom } = useRoomStore();
-  const { user } = useAuthStore();
   const isOwner = currentRoom?.participants?.find(p => p.isOwner && p.id === socketService.getSocket()?.id);
   
-  // 타이머 시작 시간 기록용
+  // 💡 타이머 시작 시간 기록용
   const startTimeRef = useRef(null);
-  const initialMinutesRef = useRef(25);
+  const initialMinutesRef = useRef(initialMinutes);
+  const serverStartedAtRef = useRef(currentRoom?.timer?.startedAt || null); // 💡 서버의 startedAt 저장
+  
+  // 💡 타이머 동기화 간격 (1분마다 서버 시간과 재동기화)
+  const syncIntervalRef = useRef(null);
 
+  // 💡 컴포넌트 마운트 시 currentRoom의 타이머 상태 적용
   useEffect(() => {
-    // 타이머 동기화 이벤트 수신
+    if (currentRoom?.timer) {
+      const { minutes: m, seconds: s, isRunning: running, totalSeconds, startedAt } = currentRoom.timer;
+      
+      setTimerState(m, s, running, totalSeconds);
+      initialMinutesRef.current = Math.floor(totalSeconds / 60);
+      serverStartedAtRef.current = startedAt;
+      
+      if (running && startedAt) {
+        startTimeRef.current = startedAt;
+      }
+      
+      console.log('⏱️ Timer initialized from currentRoom:', currentRoom.timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 💡 의도적으로 마운트 시 한 번만 실행
+
+  // 💡 서버로부터 타이머 상태 동기화
+  useEffect(() => {
     socketService.onTimerSync((timerData) => {
-      // 💡 newTotalSeconds를 setTimerState에 전달하도록 수정 필요 (useTimer 훅 업데이트에 맞춤)
-      setTimerState(timerData.minutes, timerData.seconds, timerData.isRunning, timerData.totalSeconds); 
+      console.log('📡 Timer sync received:', timerData);
+      
+      // 💡 서버의 startedAt 저장
+      if (timerData.startedAt) {
+        serverStartedAtRef.current = timerData.startedAt;
+      }
+      
+      // 💡 타이머가 실행 중이고 startedAt이 있으면 정확한 시간 계산
+      if (timerData.isRunning && timerData.startedAt) {
+        const elapsed = Math.floor((Date.now() - timerData.startedAt) / 1000);
+        const remaining = Math.max(0, timerData.totalSeconds - elapsed);
+        
+        const calculatedMinutes = Math.floor(remaining / 60);
+        const calculatedSeconds = remaining % 60;
+        
+        console.log('⏱️ Calculated time:', { 
+          minutes: calculatedMinutes, 
+          seconds: calculatedSeconds,
+          elapsed,
+          remaining 
+        });
+        
+        setTimerState(
+          calculatedMinutes,
+          calculatedSeconds,
+          timerData.isRunning,
+          timerData.totalSeconds
+        );
+      } else {
+        // 💡 일시정지 또는 리셋된 경우 서버 값 그대로 사용
+        setTimerState(
+          timerData.minutes,
+          timerData.seconds,
+          timerData.isRunning,
+          timerData.totalSeconds
+        );
+      }
     });
 
     return () => {
       socketService.off('timer-sync');
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
     };
   }, [setTimerState]);
+
+  // 💡 타이머 실행 중일 때 주기적 동기화 (1분마다)
+  useEffect(() => {
+    if (isRunning && serverStartedAtRef.current) {
+      // 1분마다 서버 시간 기준으로 재계산
+      syncIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - serverStartedAtRef.current) / 1000);
+        const remaining = Math.max(0, (minutes * 60 + seconds) - 1); // 현재 남은 시간 기준
+        
+        // 드리프트 감지 (5초 이상 차이나면 재동기화)
+        const expectedRemaining = Math.max(0, initialMinutesRef.current * 60 - elapsed);
+        const drift = Math.abs(remaining - expectedRemaining);
+        
+        if (drift > 5) {
+          console.log('⚠️ Timer drift detected, requesting sync...', {
+            current: remaining,
+            expected: expectedRemaining,
+            drift
+          });
+          
+          // 서버에 동기화 요청 (선택사항)
+          socketService.requestTimerSync(roomId);
+        }
+      }, 60000); // 1분마다
+      
+      return () => {
+        if (syncIntervalRef.current) {
+          clearInterval(syncIntervalRef.current);
+        }
+      };
+    } else {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+    }
+  }, [isRunning, minutes, seconds, roomId]);
 
   // 타이머 완료 감지 및 공부 시간 기록
   useEffect(() => {
     const recordStudyTime = async () => {
       // 타이머가 0이 되고, 이전에 실행 중이었던 경우
       if (minutes === 0 && seconds === 0 && startTimeRef.current && !isRunning) {
-        // initialMinutesRef.current는 분 단위로 유지
-        const studiedMinutes = initialMinutesRef.current; 
+        const studiedMinutes = initialMinutesRef.current;
         
         try {
           // DB에 공부 세션 기록
@@ -50,7 +150,7 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
           
           console.log(`✅ 공부 시간 기록: ${studiedMinutes}분`);
           
-          // 알림 표시
+          // 브라우저 알림 표시
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('공부 완료! 🎉', {
               body: `${studiedMinutes}분 동안 집중했습니다!`,
@@ -60,6 +160,7 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
           
           // 기록 완료 후 초기화
           startTimeRef.current = null;
+          serverStartedAtRef.current = null;
         } catch (error) {
           console.error('Failed to record study session:', error);
         }
@@ -68,6 +169,15 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
 
     recordStudyTime();
   }, [minutes, seconds, isRunning, user, roomId]);
+
+  // 💡 컴포넌트 마운트 시 브라우저 알림 권한 요청
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        console.log('Notification permission:', permission);
+      });
+    }
+  }, []);
 
   // 시간 포맷팅
   const formatTime = (num) => String(num).padStart(2, '0');
@@ -87,9 +197,15 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
       start();
       socketService.timerStart(roomId);
       
-      // 타이머 시작 시간 기록
+      // 💡 타이머 시작 시간 기록
       startTimeRef.current = Date.now();
+      serverStartedAtRef.current = Date.now();
       initialMinutesRef.current = minutes; // 현재 남은 분을 기록
+      
+      console.log('▶️ Timer started:', {
+        startedAt: new Date(startTimeRef.current).toLocaleTimeString(),
+        initialMinutes: initialMinutesRef.current
+      });
     }
   };
 
@@ -97,18 +213,28 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
     if (isOwner) {
       pause();
       socketService.timerPause(roomId);
+      
+      // 💡 일시정지 시 시작 시간 초기화
+      serverStartedAtRef.current = null;
+      
+      console.log('⏸️ Timer paused at:', {
+        minutes,
+        seconds
+      });
     }
   };
 
   const handleReset = () => {
     if (isOwner) {
-      // 훅의 reset은 initialMinutes로 돌아가지만, 소켓은 명시적으로 25분을 보냅니다.
-      reset(); 
+      reset();
       socketService.timerReset(roomId, 25);
       
-      // 리셋 시 시작 시간 초기화
+      // 💡 리셋 시 모든 참조 초기화
       startTimeRef.current = null;
+      serverStartedAtRef.current = null;
       initialMinutesRef.current = 25;
+      
+      console.log('🔄 Timer reset to 25 minutes');
     }
   };
 
@@ -118,9 +244,12 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
       socketService.timerReset(roomId, newMinutes);
       setShowPresets(false);
       
-      // 시간 변경 시 초기화
+      // 💡 시간 변경 시 초기화
       startTimeRef.current = null;
+      serverStartedAtRef.current = null;
       initialMinutesRef.current = newMinutes;
+      
+      console.log(`⏱️ Timer set to ${newMinutes} minutes`);
     }
   };
 
@@ -137,7 +266,6 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
   };
 
   return (
-    // 💡 1. 집중 모드일 때 전체 화면 스타일 적용
     <div 
       className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-8 ${
         isFocusMode ? 'w-full h-full flex flex-col justify-center items-center' : ''
@@ -149,7 +277,7 @@ function Timer({ roomId, onToggleFocus, isFocusMode }) {
         </h2>
         
         <div className='flex items-center gap-3'>
-          {/* 💡 2. 집중 모드 토글 버튼 */}
+          {/* 집중 모드 토글 버튼 */}
           <button
             onClick={onToggleFocus}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

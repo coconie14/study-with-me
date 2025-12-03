@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import GalleryPage from './pages/GalleryPage';
 import RoomPage from './pages/RoomPage';
 import ProfilePage from './pages/ProfilePage';
+import FriendsPage from './pages/FriendsPage';
 import useAuthStore from './store/authStore';
 import useThemeStore from './store/themeStore';
 import { auth } from './lib/supabase';
@@ -99,6 +100,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/friends"
+              element={
+                <ProtectedRoute>
+                  <FriendsPage />
                 </ProtectedRoute>
               }
             />

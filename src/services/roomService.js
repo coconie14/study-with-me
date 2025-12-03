@@ -12,8 +12,8 @@ class RoomService {
             description: roomData.description || '',
             owner_id: roomData.ownerId,
             max_participants: roomData.maxParticipants || 6,
-            emoji: roomData.emoji || '📚', // ✅ 기본 이모지
-            cover_image_url: roomData.coverImageUrl || null, // ✅ 이미지 URL
+            emoji: roomData.emoji || '📚',
+            cover_image_url: roomData.coverImageUrl || null,
             is_active: true,
           },
         ])
@@ -60,14 +60,16 @@ class RoomService {
 
       const profileMap = new Map(profiles?.map(p => [p.id, p.nickname]) || []);
 
-      // ✅ 이모지와 이미지 포함해서 리턴
-      const roomsWithDetails = data.map((room) => ({
-        ...room,
-        participantCount: room.room_participants?.length || 0,
-        ownerNickname: profileMap.get(room.owner_id) || 'Unknown',
-        emoji: room.emoji || '📚',
-        coverImageUrl: room.cover_image_url || null,
-      }));
+      // 💡 참여자가 0명인 방 필터링
+      const roomsWithDetails = data
+        .filter(room => room.room_participants && room.room_participants.length > 0)
+        .map((room) => ({
+          ...room,
+          participantCount: room.room_participants?.length || 0,
+          ownerNickname: profileMap.get(room.owner_id) || 'Unknown',
+          emoji: room.emoji || '📚',
+          coverImageUrl: room.cover_image_url || null,
+        }));
 
       return roomsWithDetails;
     } catch (error) {
@@ -180,8 +182,41 @@ class RoomService {
         .eq('id', roomId);
 
       if (error) throw error;
+      
+      console.log(`✅ Room ${roomId} deactivated (is_active: false)`);
     } catch (error) {
       console.error('방 비활성화 오류:', error);
+      throw error;
+    }
+  }
+
+  // 💡 강제 삭제 메소드 (새로 추가)
+  async forceDeleteRoom(roomId) {
+    try {
+      console.log(`🗑️ Force deleting room: ${roomId}`);
+      
+      // 1. 참여자 먼저 삭제 (CASCADE가 없는 경우 대비)
+      const { error: participantsError } = await supabase
+        .from('room_participants')
+        .delete()
+        .eq('room_id', roomId);
+      
+      if (participantsError) {
+        console.warn('참여자 삭제 중 경고:', participantsError);
+      }
+      
+      // 2. 방 완전 삭제
+      const { error: roomError } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', roomId);
+      
+      if (roomError) throw roomError;
+      
+      console.log(`✅ Room ${roomId} permanently deleted`);
+      return { success: true };
+    } catch (error) {
+      console.error('강제 삭제 오류:', error);
       throw error;
     }
   }
@@ -269,6 +304,8 @@ class RoomService {
         .eq('user_id', newOwnerId);
 
       if (newOwnerError) throw newOwnerError;
+      
+      console.log(`✅ Ownership transferred to ${newOwnerId}`);
     } catch (error) {
       console.error('방장 권한 이전 오류:', error);
       throw error;

@@ -14,7 +14,7 @@ function IntroPage() {
             Study With Me
           </h1>
           <p className="text-xl text-white/90">
-            함께 공부하는 즐거움, 지금 시작하세요
+            사람들과 함께하는 웹 공부방 사이트
           </p>
         </div>
 

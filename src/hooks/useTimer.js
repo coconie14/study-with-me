@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 function useTimer(initialMinutes = 25) {
-  // 💡 수정: 남은 시간을 '초' 단위로만 관리
+  // 💡 남은 시간을 '초' 단위로만 관리
   const [remainingTime, setRemainingTime] = useState(initialMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
   
@@ -25,6 +25,7 @@ function useTimer(initialMinutes = 25) {
         const now = Date.now();
         const elapsed = now - lastTickRef.current;
         
+        // 💡 1초 이상 경과했을 때만 업데이트 (정확도 향상)
         if (elapsed >= 1000) {
           lastTickRef.current = now;
           
@@ -37,7 +38,7 @@ function useTimer(initialMinutes = 25) {
             return prevTime - 1;
           });
         }
-      }, 100);
+      }, 100); // 100ms마다 체크하지만 1초마다만 업데이트
       
     } else {
       if (intervalRef.current) {
@@ -58,7 +59,7 @@ function useTimer(initialMinutes = 25) {
 
   const start = () => {
     if (remainingTime > 0) {
-        setIsRunning(true);
+      setIsRunning(true);
     }
   };
 
@@ -83,20 +84,39 @@ function useTimer(initialMinutes = 25) {
     ? ((initialTotalSecondsRef.current - remainingTime) / initialTotalSecondsRef.current) * 100 
     : 0;
 
-  // 타이머 상태를 외부에서 설정 (Socket 동기화용)
+  // 💡 타이머 상태를 외부에서 설정 (Socket 동기화용)
   const setTimerState = (newMinutes, newSeconds, newIsRunning, newTotalSeconds) => {
+    console.log('⚙️ setTimerState called:', {
+      minutes: newMinutes,
+      seconds: newSeconds,
+      isRunning: newIsRunning,
+      totalSeconds: newTotalSeconds
+    });
+
     // Socket에서 분/초로 왔다면 초로 변환하여 설정
     const newRemainingTime = newMinutes * 60 + newSeconds;
     
-    // totalSeconds를 받으면 그것을 기준으로 진행률 초기화
-    initialTotalSecondsRef.current = newTotalSeconds;
+    // 💡 totalSeconds를 받으면 그것을 기준으로 진행률 초기화
+    if (newTotalSeconds !== undefined && newTotalSeconds > 0) {
+      initialTotalSecondsRef.current = newTotalSeconds;
+    } else {
+      // totalSeconds가 없으면 현재 남은 시간을 기준으로
+      initialTotalSecondsRef.current = newRemainingTime;
+    }
 
     setRemainingTime(newRemainingTime);
     setIsRunning(newIsRunning);
     
+    // 💡 타이머가 시작되면 lastTick 업데이트
     if (newIsRunning) {
       lastTickRef.current = Date.now();
     }
+    
+    console.log('✅ Timer state updated:', {
+      remainingTime: newRemainingTime,
+      initialTotal: initialTotalSecondsRef.current,
+      progress: ((initialTotalSecondsRef.current - newRemainingTime) / initialTotalSecondsRef.current) * 100
+    });
   };
 
   return {

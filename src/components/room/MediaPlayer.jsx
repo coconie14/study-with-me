@@ -4,18 +4,43 @@ import socketService from '../../services/socket';
 import useRoomStore from '../../store/roomStore';
 
 function MediaPlayer({ roomId }) {
-  const [url, setUrl] = useState('');
-  const [videoId, setVideoId] = useState('');
-  const [player, setPlayer] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(50);
-  const [videoSize, setVideoSize] = useState('large'); // 👈 'large', 'small', 'audio'
-  const playerRef = useRef(null);
-  const isLoadingRef = useRef(false);
-  
   const { currentRoom } = useRoomStore();
   const isOwner = currentRoom?.participants?.find(p => p.isOwner && p.id === socketService.getSocket()?.id);
+  
+  // 💡 currentRoom의 미디어 상태로 초기화
+  const initialVideoId = currentRoom?.media?.videoId || '';
+  const initialIsPlaying = currentRoom?.media?.isPlaying || false;
+  const initialVolume = currentRoom?.media?.volume || 50;
+  
+  const [url, setUrl] = useState('');
+  const [videoId, setVideoId] = useState(initialVideoId);
+  const [player, setPlayer] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(initialIsPlaying);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(initialVolume);
+  const [videoSize, setVideoSize] = useState('large'); // 'large', 'small', 'audio'
+  const playerRef = useRef(null);
+  const isLoadingRef = useRef(false);
+
+  // 💡 컴포넌트 마운트 시 currentRoom의 미디어 상태 복원
+  useEffect(() => {
+    if (currentRoom?.media?.videoId && !videoId) {
+      const mediaState = currentRoom.media;
+      
+      console.log('🎵 Restoring media state:', mediaState);
+      setVideoId(mediaState.videoId);
+      setIsPlaying(mediaState.isPlaying);
+      setVolume(mediaState.volume || 50);
+      
+      // 💡 YouTube 플레이어 생성 (API가 준비되면)
+      if (window.YT && window.YT.Player) {
+        setTimeout(() => {
+          createPlayer(mediaState.videoId);
+        }, 500);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 마운트 시 한 번만
 
   // 크기 순환: large → small → audio → large
   const cycleVideoSize = () => {
@@ -28,7 +53,6 @@ function MediaPlayer({ roomId }) {
 
   // YouTube IFrame API 로드
   useEffect(() => {
-    // API가 이미 로드되어 있는지 확인
     if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
@@ -36,10 +60,17 @@ function MediaPlayer({ roomId }) {
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
 
-    // API 준비 완료 이벤트
     window.onYouTubeIframeAPIReady = () => {
       console.log('YouTube API Ready');
+      
+      // 💡 API 준비 후 복원해야 할 비디오가 있으면 플레이어 생성
+      if (currentRoom?.media?.videoId) {
+        setTimeout(() => {
+          createPlayer(currentRoom.media.videoId);
+        }, 500);
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // YouTube URL에서 Video ID 추출
@@ -65,7 +96,7 @@ function MediaPlayer({ roomId }) {
 
     // playerRef에 고유 ID 설정
     if (!playerRef.current.id) {
-      playerRef.current.id = `Youtubeer-${Date.now()}`;
+      playerRef.current.id = `youtube-player-${Date.now()}`;
     }
 
     // 새 플레이어 생성
@@ -73,7 +104,7 @@ function MediaPlayer({ roomId }) {
       const newPlayer = new window.YT.Player(playerRef.current.id, {
         videoId: id,
         playerVars: {
-          autoplay: 1,
+          autoplay: isPlaying ? 1 : 0, // 💡 상태에 따라 자동재생
           controls: 1,
           modestbranding: 1,
           rel: 0,
@@ -81,8 +112,14 @@ function MediaPlayer({ roomId }) {
         events: {
           onReady: (event) => {
             event.target.setVolume(volume);
-            setIsPlaying(true);
+            
+            // 💡 복원된 상태가 재생 중이었으면 자동 재생
+            if (isPlaying) {
+              event.target.playVideo();
+            }
+            
             isLoadingRef.current = false;
+            console.log('✅ YouTube player ready');
           },
           onStateChange: (event) => {
             if (event.data === window.YT.PlayerState.PLAYING) {
@@ -112,7 +149,7 @@ function MediaPlayer({ roomId }) {
         setTimeout(() => {
           createPlayer(mediaData.videoId);
         }, 100);
-        return; // 새 플레이어 생성 중이면 나머지는 스킵
+        return;
       }
 
       // 재생/일시정지 동기화 (방장이 아닐 때만)
@@ -124,8 +161,6 @@ function MediaPlayer({ roomId }) {
           player.pauseVideo();
           setIsPlaying(false);
         }
-
-        // 볼륨은 동기화하지 않음 (개인 설정)
       }
     };
 
@@ -135,7 +170,7 @@ function MediaPlayer({ roomId }) {
       socketService.off('media-sync');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player, videoId, isPlaying, isOwner, volume]);
+  }, [player, videoId, isPlaying, isOwner]);
 
   // 영상 로드 (방장만)
   const loadVideo = () => {
@@ -271,7 +306,7 @@ function MediaPlayer({ roomId }) {
               onChange={(e) => setUrl(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && loadVideo()}
               placeholder="YouTube URL 입력 (예: https://youtu.be/jfKfPfyJRdk)"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
               onClick={loadVideo}
@@ -285,17 +320,17 @@ function MediaPlayer({ roomId }) {
 
         {/* 플레이어 컨트롤 */}
         {videoId && (
-          <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             {/* 재생/일시정지 버튼 */}
             <button
               onClick={togglePlay}
               disabled={!isOwner}
-              className="p-2 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPlaying ? (
-                <Pause className="w-5 h-5" />
+                <Pause className="w-5 h-5 text-gray-900 dark:text-white" />
               ) : (
-                <Play className="w-5 h-5" />
+                <Play className="w-5 h-5 text-gray-900 dark:text-white" />
               )}
             </button>
 
@@ -303,12 +338,12 @@ function MediaPlayer({ roomId }) {
             <div className="flex items-center gap-3 flex-1">
               <button
                 onClick={toggleMute}
-                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
               >
                 {isMuted || volume === 0 ? (
-                  <VolumeX className="w-5 h-5" />
+                  <VolumeX className="w-5 h-5 text-gray-900 dark:text-white" />
                 ) : (
-                  <Volume2 className="w-5 h-5" />
+                  <Volume2 className="w-5 h-5 text-gray-900 dark:text-white" />
                 )}
               </button>
               <input
@@ -317,12 +352,12 @@ function MediaPlayer({ roomId }) {
                 max="100"
                 value={volume}
                 onChange={handleVolumeChange}
-                className="flex-1 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                className="flex-1 h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
                 style={{
                   background: `linear-gradient(to right, #2563eb 0%, #2563eb ${volume}%, #d1d5db ${volume}%, #d1d5db 100%)`,
                 }}
               />
-              <span className="text-sm text-gray-600 w-12 text-right">
+              <span className="text-sm text-gray-600 dark:text-gray-300 w-12 text-right">
                 {volume}%
               </span>
             </div>
@@ -331,8 +366,8 @@ function MediaPlayer({ roomId }) {
 
         {/* 추천 lo-fi 링크 (방장만) */}
         {isOwner && (
-          <div className="pt-4 border-t border-gray-100">
-            <p className="text-sm text-gray-600 mb-2">추천 lo-fi 음악:</p>
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">추천 lo-fi 음악:</p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
@@ -346,9 +381,9 @@ function MediaPlayer({ roomId }) {
                     }
                   }, 100);
                 }}
-                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
+                className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
               >
-                집중 잘되는 음악 
+                집중 잘되는 음악
               </button>
               <button
                 onClick={() => {
@@ -362,7 +397,7 @@ function MediaPlayer({ roomId }) {
                     }
                   }, 100);
                 }}
-                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
+                className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
               >
                 미친 집중력 모드 ON
               </button>
