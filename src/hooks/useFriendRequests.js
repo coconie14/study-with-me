@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import friendService from '../services/friendService';
 import useAuthStore from '../store/authStore';
 
-/**
- * 친구 요청 알림 훅
- */
 export function useFriendRequests() {
   const { user } = useAuthStore();
   const [requestCount, setRequestCount] = useState(0);
